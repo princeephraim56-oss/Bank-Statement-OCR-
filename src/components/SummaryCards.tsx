@@ -1,0 +1,135 @@
+import React from 'react';
+import { TransactionItem, StatementMetadata } from '../types';
+import { ArrowUpRight, ArrowDownLeft, DollarSign, ListOrdered, Building2, Calendar, ShieldCheck } from 'lucide-react';
+
+interface SummaryCardsProps {
+  transactions: TransactionItem[];
+  metadata: StatementMetadata;
+  fileName?: string;
+}
+
+export const SummaryCards: React.FC<SummaryCardsProps> = ({
+  transactions,
+  metadata,
+  fileName
+}) => {
+  const totalCount = transactions.length;
+
+  const totalDeposits = transactions
+    .filter(t => t.amount > 0)
+    .reduce((acc, t) => acc + t.amount, 0);
+
+  const totalExpenses = transactions
+    .filter(t => t.amount < 0)
+    .reduce((acc, t) => acc + Math.abs(t.amount), 0);
+
+  const netFlow = totalDeposits - totalExpenses;
+
+  return (
+    <div className="space-y-4">
+      
+      {/* Statement Header Info Bar */}
+      <div className="bg-slate-900 text-white rounded-xl p-4 border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center space-x-3">
+          <div className="p-2 bg-emerald-500/20 text-emerald-400 rounded-lg border border-emerald-500/30">
+            <Building2 className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex items-center space-x-2">
+              <h3 className="font-bold text-sm text-white">
+                {metadata.bankName || 'Bank Statement Data'}
+              </h3>
+              {metadata.accountNumberMasked && (
+                <span className="text-xs bg-slate-800 px-2 py-0.5 rounded text-slate-300 font-mono">
+                  {metadata.accountNumberMasked}
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
+              <Calendar className="w-3.5 h-3.5" />
+              <span>{metadata.statementPeriod || 'Statement Extracted'}</span>
+              {metadata.accountHolder && (
+                <>
+                  <span>•</span>
+                  <span>{metadata.accountHolder}</span>
+                </>
+              )}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center space-x-3 text-xs">
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-emerald-950 text-emerald-300 border border-emerald-800">
+            <ShieldCheck className="w-3.5 h-3.5" /> OCR Audit Verified
+          </span>
+          {fileName && (
+            <span className="text-slate-400 font-mono text-[11px] truncate max-w-xs bg-slate-800/80 px-2 py-1 rounded">
+              Source: {fileName}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Stats Cards Row */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        
+        {/* Total Extracted */}
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs space-y-2">
+          <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
+            <span>Extracted Rows</span>
+            <div className="p-1.5 bg-slate-100 text-slate-600 rounded-lg">
+              <ListOrdered className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="text-2xl font-extrabold text-slate-900 tracking-tight">
+            {totalCount} <span className="text-xs font-normal text-slate-500">transactions</span>
+          </div>
+          <p className="text-[11px] text-slate-500">Filtered from headers & totals</p>
+        </div>
+
+        {/* Net Flow */}
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs space-y-2">
+          <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
+            <span>Net Statement Flow</span>
+            <div className={`p-1.5 rounded-lg ${netFlow >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+              <DollarSign className="w-4 h-4" />
+            </div>
+          </div>
+          <div className={`text-2xl font-extrabold tracking-tight ${netFlow >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+            {netFlow >= 0 ? '+' : '-'}${Math.abs(netFlow).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </div>
+          <p className="text-[11px] text-slate-500">Deposits minus Expenses</p>
+        </div>
+
+        {/* Total Deposits */}
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs space-y-2">
+          <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
+            <span>Total Deposits (+)</span>
+            <div className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg">
+              <ArrowDownLeft className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="text-2xl font-extrabold text-emerald-600 tracking-tight">
+            +${totalDeposits.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </div>
+          <p className="text-[11px] text-emerald-600/80 font-medium">Income, credits & transfers in</p>
+        </div>
+
+        {/* Total Expenses */}
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs space-y-2">
+          <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
+            <span>Total Expenses (-)</span>
+            <div className="p-1.5 bg-rose-50 text-rose-600 rounded-lg">
+              <ArrowUpRight className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="text-2xl font-extrabold text-rose-600 tracking-tight">
+            -${totalExpenses.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </div>
+          <p className="text-[11px] text-rose-600/80 font-medium">Debits, purchases & bill payments</p>
+        </div>
+
+      </div>
+    </div>
+  );
+};
