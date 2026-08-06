@@ -2,6 +2,252 @@ import { SampleBankStatement } from '../types';
 
 export const SAMPLE_BANK_STATEMENTS: SampleBankStatement[] = [
   {
+    id: 'multi-year-batch-statement',
+    name: '3-Year Statement Batch (2024, 2025, 2026)',
+    description: 'Multi-PDF upload sample containing 3 separate annual statements with auto-year separation in the unified CSV.',
+    accountType: 'Multi-PDF Batch (3 Statements)',
+    itemCount: 16,
+    isMultiFile: true,
+    fileCount: 3,
+    fileName: 'Multi_Year_Statements_2024_2026 (3 Files)',
+    fileType: 'application/pdf',
+    sampleData: {
+      metadata: {
+        bankName: 'JPMorgan Chase & Co.',
+        accountHolder: 'Alexander M. Wright',
+        accountNumberMasked: '402 •••• 8104',
+        statementPeriod: 'Jan 2024 - Jul 2026 (3 Years Consolidated)',
+        startingBalance: 2450.00,
+        endingBalance: 8640.00,
+        currency: 'USD',
+        currencyCode: 'USD',
+        currencySymbol: '$',
+        totalDeposits: 22800.00,
+        totalWithdrawals: 16610.00,
+        pageCount: 3
+      },
+      years: [2026, 2025, 2024],
+      files: [
+        {
+          id: 'file-2026',
+          fileName: 'Chase_Statement_2026.pdf',
+          fileSize: 1048576,
+          status: 'completed',
+          detectedYears: [2026],
+          metadata: {
+            bankName: 'JPMorgan Chase & Co.',
+            statementPeriod: 'Jan 2026 - Jul 2026'
+          }
+        },
+        {
+          id: 'file-2025',
+          fileName: 'Chase_Statement_2025.pdf',
+          fileSize: 1258291,
+          status: 'completed',
+          detectedYears: [2025],
+          metadata: {
+            bankName: 'JPMorgan Chase & Co.',
+            statementPeriod: 'Jan 2025 - Dec 2025'
+          }
+        },
+        {
+          id: 'file-2024',
+          fileName: 'Chase_Statement_2024.pdf',
+          fileSize: 984320,
+          status: 'completed',
+          detectedYears: [2024],
+          metadata: {
+            bankName: 'JPMorgan Chase & Co.',
+            statementPeriod: 'Jan 2024 - Dec 2024'
+          }
+        }
+      ],
+      transactions: [
+        // 2026 Statements
+        {
+          id: 'my-2026-1',
+          date: '2026-07-02',
+          transactionDate: '2026-07-02',
+          amount: 4200.00,
+          category: 'salary',
+          description: 'DIRECT DEP - APEX CONSULTING LLC GLOBAL PAYROLL',
+          notes: 'Direct deposit payroll',
+          sourceFile: 'Chase_Statement_2026.pdf',
+          year: 2026
+        },
+        {
+          id: 'my-2026-2',
+          date: '2026-07-05',
+          transactionDate: '2026-07-04',
+          amount: -185.50,
+          category: 'groceries',
+          description: 'WHOLE FOODS MARKET #10492 SAN FRANCISCO CA',
+          notes: 'Organic groceries',
+          sourceFile: 'Chase_Statement_2026.pdf',
+          year: 2026
+        },
+        {
+          id: 'my-2026-3',
+          date: '2026-07-10',
+          transactionDate: '2026-07-09',
+          amount: -240.00,
+          category: 'utility',
+          description: 'PACIFIC GAS & ELECTRIC SAN FRANCISCO UTILITY',
+          notes: 'Electric and gas monthly bill',
+          sourceFile: 'Chase_Statement_2026.pdf',
+          year: 2026
+        },
+        {
+          id: 'my-2026-4',
+          date: '2026-07-15',
+          transactionDate: '2026-07-14',
+          amount: -89.99,
+          category: 'software',
+          description: 'AWS CLOUD SERVICES BILLING SEATTLE WA',
+          notes: 'Cloud infrastructure hosting',
+          sourceFile: 'Chase_Statement_2026.pdf',
+          year: 2026
+        },
+        {
+          id: 'my-2026-5',
+          date: '2026-07-24',
+          transactionDate: '2026-07-23',
+          amount: -46.00,
+          category: 'fees',
+          description: 'CHASE MONTHLY SERVICE FEE',
+          notes: 'Account maintenance fee',
+          sourceFile: 'Chase_Statement_2026.pdf',
+          year: 2026
+        },
+
+        // 2025 Statements
+        {
+          id: 'my-2025-1',
+          date: '2025-12-18',
+          transactionDate: '2025-12-18',
+          amount: 5200.00,
+          category: 'income',
+          description: 'CLIENT WIRE - STRATOS DIGITAL TECH INVOICE #409',
+          notes: 'Contract Q4 Milestone',
+          sourceFile: 'Chase_Statement_2025.pdf',
+          year: 2025
+        },
+        {
+          id: 'my-2025-2',
+          date: '2025-11-20',
+          transactionDate: '2025-11-19',
+          amount: -320.40,
+          category: 'shopping',
+          description: 'AMAZON.COM*MD492 RETAIL PURCHASE WA',
+          notes: 'Ergonomic office equipment',
+          sourceFile: 'Chase_Statement_2025.pdf',
+          year: 2025
+        },
+        {
+          id: 'my-2025-3',
+          date: '2025-10-12',
+          transactionDate: '2025-10-12',
+          amount: -1450.00,
+          category: 'bills',
+          description: 'APARTMENT RENT WIRE TRANS BAY RENTAL HOLDINGS',
+          notes: 'Monthly property rent',
+          sourceFile: 'Chase_Statement_2025.pdf',
+          year: 2025
+        },
+        {
+          id: 'my-2025-4',
+          date: '2025-08-04',
+          transactionDate: '2025-08-03',
+          amount: -95.00,
+          category: 'fuel',
+          description: 'CHEVRON 0092144 OAKLAND CA GAS STATION',
+          notes: 'Vehicle refueling',
+          sourceFile: 'Chase_Statement_2025.pdf',
+          year: 2025
+        },
+        {
+          id: 'my-2025-5',
+          date: '2025-06-15',
+          transactionDate: '2025-06-15',
+          amount: 4500.00,
+          category: 'salary',
+          description: 'DIRECT DEP - APEX CONSULTING LLC GLOBAL PAYROLL',
+          notes: 'Direct deposit payroll',
+          sourceFile: 'Chase_Statement_2025.pdf',
+          year: 2025
+        },
+        {
+          id: 'my-2025-6',
+          date: '2025-03-22',
+          transactionDate: '2025-03-21',
+          amount: -78.20,
+          category: 'food',
+          description: 'DOORDASH*NOODLE BAR SAN FRANCISCO CA',
+          notes: 'Dinner takeaway',
+          sourceFile: 'Chase_Statement_2025.pdf',
+          year: 2025
+        },
+
+        // 2024 Statements
+        {
+          id: 'my-2024-1',
+          date: '2024-11-28',
+          transactionDate: '2024-11-28',
+          amount: 4900.00,
+          category: 'salary',
+          description: 'DIRECT DEP - APEX CONSULTING LLC GLOBAL PAYROLL',
+          notes: 'Direct deposit payroll',
+          sourceFile: 'Chase_Statement_2024.pdf',
+          year: 2024
+        },
+        {
+          id: 'my-2024-2',
+          date: '2024-09-14',
+          transactionDate: '2024-09-13',
+          amount: -450.00,
+          category: 'healthcare',
+          description: 'KAISER PERMANENTE MEDICAL COPAY OAKLAND',
+          notes: 'Annual health checkup copay',
+          sourceFile: 'Chase_Statement_2024.pdf',
+          year: 2024
+        },
+        {
+          id: 'my-2024-3',
+          date: '2024-07-08',
+          transactionDate: '2024-07-08',
+          amount: 4000.00,
+          category: 'income',
+          description: 'INCOMING WIRE ACME VENTURES INC CONSULTING',
+          notes: 'Consulting services fee',
+          sourceFile: 'Chase_Statement_2024.pdf',
+          year: 2024
+        },
+        {
+          id: 'my-2024-4',
+          date: '2024-05-19',
+          transactionDate: '2024-05-18',
+          amount: -125.00,
+          category: 'transport',
+          description: 'UBER TRIP SAN FRANCISCO AIRPORT SFO',
+          notes: 'Airport commute ride',
+          sourceFile: 'Chase_Statement_2024.pdf',
+          year: 2024
+        },
+        {
+          id: 'my-2024-5',
+          date: '2024-02-10',
+          transactionDate: '2024-02-09',
+          amount: -65.00,
+          category: 'entertainment',
+          description: 'AMC THEATRES METREON 16 SAN FRANCISCO',
+          notes: 'Cinema movie tickets',
+          sourceFile: 'Chase_Statement_2024.pdf',
+          year: 2024
+        }
+      ]
+    }
+  },
+  {
     id: 'gtbank-naira-current',
     name: 'GTBank Nigeria - Naira Current Statement',
     description: 'Guaranty Trust Bank monthly statement with salary credit, NIP transfers, POS payments, DSTV, and utilities.',

@@ -1,12 +1,15 @@
 import React from 'react';
-import { TransactionItem, StatementMetadata, CurrencyConfig } from '../types';
-import { ArrowUpRight, ArrowDownLeft, DollarSign, ListOrdered, Building2, Calendar, ShieldCheck, Tag } from 'lucide-react';
+import { TransactionItem, StatementMetadata, CurrencyConfig, ProcessedFileItem } from '../types';
+import { ArrowUpRight, ArrowDownLeft, Building2, Calendar, ShieldCheck, Files, Layers } from 'lucide-react';
 import { formatCurrencyAmount } from '../utils/currency';
+import { extractTransactionYear } from '../utils/csv';
 
 interface SummaryCardsProps {
   transactions: TransactionItem[];
   metadata: StatementMetadata;
   fileName?: string;
+  files?: ProcessedFileItem[];
+  years?: number[];
   currency: CurrencyConfig;
 }
 
@@ -14,6 +17,8 @@ export const SummaryCards: React.FC<SummaryCardsProps> = ({
   transactions,
   metadata,
   fileName,
+  files = [],
+  years = [],
   currency
 }) => {
   const totalCount = transactions.length;
@@ -28,6 +33,18 @@ export const SummaryCards: React.FC<SummaryCardsProps> = ({
 
   const netFlow = totalDeposits - totalExpenses;
 
+  // Calculate year breakdown
+  const yearCounts = React.useMemo(() => {
+    const counts: Record<number, number> = {};
+    for (const t of transactions) {
+      const yr = extractTransactionYear(t);
+      counts[yr] = (counts[yr] || 0) + 1;
+    }
+    return Object.entries(counts).sort(([a], [b]) => Number(b) - Number(a));
+  }, [transactions]);
+
+  const fileCount = files && files.length > 0 ? files.length : (fileName?.includes('Files') ? 3 : 1);
+
   return (
     <div className="space-y-4">
       
@@ -38,7 +55,7 @@ export const SummaryCards: React.FC<SummaryCardsProps> = ({
             <Building2 className="w-5 h-5" />
           </div>
           <div>
-            <div className="flex items-center space-x-2 flex-wrap">
+            <div className="flex items-center space-x-2 flex-wrap gap-y-1">
               <h3 className="font-bold text-sm sm:text-base text-white">
                 {metadata.bankName || 'Bank Statement Data'}
               </h3>
@@ -50,8 +67,13 @@ export const SummaryCards: React.FC<SummaryCardsProps> = ({
               <span className="text-[11px] bg-emerald-950 text-emerald-300 font-bold px-2 py-0.5 rounded border border-emerald-800">
                 {currency.code} ({currency.symbol})
               </span>
+              {fileCount > 1 && (
+                <span className="text-[11px] bg-blue-950 text-blue-300 font-semibold px-2 py-0.5 rounded border border-blue-800 flex items-center gap-1">
+                  <Files className="w-3 h-3" /> {fileCount} Statements Batch
+                </span>
+              )}
             </div>
-            <p className="text-xs text-slate-400 flex items-center gap-1.5 mt-1 flex-wrap">
+            <div className="flex items-center gap-1.5 mt-1 flex-wrap text-xs text-slate-400">
               <Calendar className="w-3.5 h-3.5 text-slate-400" />
               <span>{metadata.statementPeriod || 'Statement Period Extracted'}</span>
               {metadata.accountHolder && (
@@ -60,11 +82,11 @@ export const SummaryCards: React.FC<SummaryCardsProps> = ({
                   <span className="text-slate-300 font-medium">{metadata.accountHolder}</span>
                 </>
               )}
-            </p>
+            </div>
           </div>
         </div>
 
-        <div className="flex items-center space-x-2.5 text-xs flex-wrap">
+        <div className="flex items-center space-x-2.5 text-xs flex-wrap gap-y-2">
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-950 text-emerald-300 border border-emerald-800 font-medium">
             <ShieldCheck className="w-4 h-4 text-emerald-400" /> OCR Verified
           </span>
@@ -79,18 +101,28 @@ export const SummaryCards: React.FC<SummaryCardsProps> = ({
       {/* Stats Cards Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         
-        {/* Total Extracted */}
+        {/* Total Extracted & Year Breakdown */}
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-2">
           <div className="flex items-center justify-between text-slate-500 text-xs font-semibold uppercase tracking-wider">
-            <span>Extracted Rows</span>
+            <span>Total Transactions</span>
             <div className="p-1.5 bg-slate-100 text-slate-700 rounded-lg">
-              <ListOrdered className="w-4 h-4" />
+              <Layers className="w-4 h-4" />
             </div>
           </div>
           <div className="text-2xl font-extrabold text-slate-900 tracking-tight">
-            {totalCount} <span className="text-xs font-medium text-slate-500">transactions</span>
+            {totalCount} <span className="text-xs font-medium text-slate-500">rows</span>
           </div>
-          <p className="text-[11px] text-slate-400">Cleaned & header summaries omitted</p>
+          {yearCounts.length > 1 ? (
+            <div className="flex flex-wrap gap-1 text-[10px]">
+              {yearCounts.map(([yr, cnt]) => (
+                <span key={yr} className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-medium">
+                  {yr}: <strong>{cnt}</strong>
+                </span>
+              ))}
+            </div>
+          ) : (
+            <p className="text-[11px] text-slate-400">Single consolidated dataset</p>
+          )}
         </div>
 
         {/* Net Flow */}

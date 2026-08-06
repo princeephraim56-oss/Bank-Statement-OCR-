@@ -6,6 +6,8 @@ export interface TransactionItem {
   category: string;
   description: string;
   notes: string;
+  sourceFile?: string;
+  year?: number;
 }
 
 export interface CurrencyConfig {
@@ -30,9 +32,22 @@ export interface StatementMetadata {
   pageCount?: number;
 }
 
+export interface ProcessedFileItem {
+  id: string;
+  fileName: string;
+  fileSize: number;
+  status: 'pending' | 'processing' | 'completed' | 'error';
+  error?: string;
+  metadata?: StatementMetadata;
+  transactions?: TransactionItem[];
+  detectedYears?: number[];
+}
+
 export interface ExtractionResult {
   metadata: StatementMetadata;
   transactions: TransactionItem[];
+  files?: ProcessedFileItem[];
+  years?: number[];
   rawCsvText?: string;
 }
 
@@ -46,6 +61,8 @@ export interface SampleBankStatement {
   fileBase64?: string;
   fileType?: string;
   fileName?: string;
+  isMultiFile?: boolean;
+  fileCount?: number;
 }
 
 export const SUPPORTED_CURRENCIES: CurrencyConfig[] = [
@@ -64,4 +81,5 @@ export const SUPPORTED_CURRENCIES: CurrencyConfig[] = [
   { code: 'AED', symbol: 'AED', name: 'UAE Dirham (AED)', locale: 'ar-AE' },
   { code: 'SGD', symbol: '$', name: 'Singapore Dollar ($ SGD)', locale: 'en-SG' }
 ];
+
 
