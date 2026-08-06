@@ -10,8 +10,10 @@ import { SummaryCards } from './components/SummaryCards';
 import { TransactionTable } from './components/TransactionTable';
 import { CategoryChart } from './components/CategoryChart';
 import { CodeInstructionsModal } from './components/CodeInstructionsModal';
-import { ExtractionResult, SampleBankStatement, TransactionItem } from './types';
-import { FileSpreadsheet, ArrowLeft, RefreshCw, CheckCircle2, Sparkles } from 'lucide-react';
+import { DeploymentTroubleshootingModal } from './components/DeploymentTroubleshootingModal';
+import { ExtractionResult, SampleBankStatement, TransactionItem, CurrencyConfig, SUPPORTED_CURRENCIES } from './types';
+import { getCurrencyConfig } from './utils/currency';
+import { FileSpreadsheet, ArrowLeft, CheckCircle2, Sparkles, HelpCircle } from 'lucide-react';
 
 export default function App() {
   const [extractionResult, setExtractionResult] = useState<ExtractionResult | null>(null);
@@ -19,6 +21,10 @@ export default function App() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [isCodeGuideOpen, setIsCodeGuideOpen] = useState<boolean>(false);
+  const [isDeployHelpOpen, setIsDeployHelpOpen] = useState<boolean>(false);
+  
+  // Currency state - Defaults to Nigerian Naira (₦ / NGN)
+  const [currentCurrency, setCurrentCurrency] = useState<CurrencyConfig>(SUPPORTED_CURRENCIES[0]);
 
   // Handle live PDF/Image OCR extraction request to backend Express /api/extract
   const handleProcessFile = async (fileData: string, mimeType: string, fileName: string) => {
@@ -43,8 +49,13 @@ export default function App() {
         throw new Error(json.message || json.error || 'Failed to extract transactions from document.');
       }
 
+      const meta = json.data.metadata || {};
+      if (meta.currency) {
+        setCurrentCurrency(getCurrencyConfig(meta.currency));
+      }
+
       setExtractionResult({
-        metadata: json.data.metadata || {},
+        metadata: meta,
         transactions: json.data.transactions || []
       });
 
@@ -60,6 +71,9 @@ export default function App() {
   const handleSelectSample = (sample: SampleBankStatement) => {
     setError(null);
     setActiveFileName(sample.fileName);
+    if (sample.sampleData.metadata.currency) {
+      setCurrentCurrency(getCurrencyConfig(sample.sampleData.metadata.currency));
+    }
     setExtractionResult(sample.sampleData);
   };
 
@@ -87,8 +101,11 @@ export default function App() {
       <Header
         onSelectSample={handleSelectSample}
         onOpenCodeGuide={() => setIsCodeGuideOpen(true)}
+        onOpenDeployHelp={() => setIsDeployHelpOpen(true)}
         onReset={handleReset}
         hasData={!!extractionResult}
+        currentCurrency={currentCurrency}
+        onChangeCurrency={setCurrentCurrency}
       />
 
       {/* Main Content Area */}
@@ -113,7 +130,7 @@ export default function App() {
               <div className="flex items-center space-x-3">
                 <button
                   onClick={handleReset}
-                  className="p-2 bg-white hover:bg-slate-50 border border-slate-300 rounded-xl text-slate-700 shadow-2xs transition-colors flex items-center space-x-1 text-xs font-semibold"
+                  className="p-2 bg-white hover:bg-slate-50 border border-slate-300 rounded-xl text-slate-700 shadow-2xs transition-colors flex items-center space-x-1 text-xs font-semibold cursor-pointer"
                 >
                   <ArrowLeft className="w-4 h-4" />
                   <span>Upload Another File</span>
@@ -134,8 +151,15 @@ export default function App() {
 
               <div className="flex items-center space-x-2">
                 <button
+                  onClick={() => setIsDeployHelpOpen(true)}
+                  className="px-3 py-2 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-xl border border-slate-300 shadow-2xs flex items-center space-x-1.5 transition-colors cursor-pointer"
+                >
+                  <HelpCircle className="w-3.5 h-3.5 text-sky-500" />
+                  <span>GitHub & Hosting Guide</span>
+                </button>
+                <button
                   onClick={() => setIsCodeGuideOpen(true)}
-                  className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-xl shadow-2xs flex items-center space-x-1.5 transition-colors"
+                  className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-xl shadow-2xs flex items-center space-x-1.5 transition-colors cursor-pointer"
                 >
                   <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
                   <span>Integration Code Snippet</span>
@@ -148,6 +172,7 @@ export default function App() {
               transactions={extractionResult.transactions}
               metadata={extractionResult.metadata}
               fileName={activeFileName}
+              currency={currentCurrency}
             />
 
             {/* Category Chart & Table Grid */}
@@ -155,7 +180,10 @@ export default function App() {
               
               {/* Category Breakdown Sidebar */}
               <div className="lg:col-span-1 space-y-6">
-                <CategoryChart transactions={extractionResult.transactions} />
+                <CategoryChart
+                  transactions={extractionResult.transactions}
+                  currency={currentCurrency}
+                />
 
                 {/* Quick Google Sheets Instructions Box */}
                 <div className="bg-emerald-900/90 text-emerald-100 rounded-xl p-4 text-xs space-y-2 border border-emerald-800 shadow-2xs">
@@ -163,8 +191,8 @@ export default function App() {
                     <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
                     <span>Google Sheets Quick Paste</span>
                   </div>
-                  <p className="text-emerald-200/90">
-                    Click <strong>"Copy for Google Sheets"</strong> above the table, then open Google Sheets and press <code className="bg-emerald-950 px-1 py-0.5 rounded text-white font-mono">Ctrl+V</code> on cell A1.
+                  <p className="text-emerald-200/90 leading-relaxed">
+                    Click <strong>"Copy for Google Sheets"</strong> above the table, then open Google Sheets and press <code className="bg-emerald-950 px-1.5 py-0.5 rounded text-white font-mono font-bold">Ctrl+V</code> on cell A1.
                   </p>
                 </div>
               </div>
@@ -174,6 +202,7 @@ export default function App() {
                 <TransactionTable
                   transactions={extractionResult.transactions}
                   onUpdateTransactions={handleUpdateTransactions}
+                  currency={currentCurrency}
                 />
               </div>
 
@@ -190,11 +219,19 @@ export default function App() {
         onClose={() => setIsCodeGuideOpen(false)}
       />
 
+      {/* Deployment Troubleshooting Modal */}
+      <DeploymentTroubleshootingModal
+        isOpen={isDeployHelpOpen}
+        onClose={() => setIsDeployHelpOpen(false)}
+      />
+
       {/* Footer */}
       <footer className="bg-white border-t border-slate-200 py-6 mt-auto text-center text-xs text-slate-500">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="flex items-center space-x-2">
             <span className="font-bold text-slate-700">Bank Statement OCR Extractor</span>
+            <span>•</span>
+            <span>Default Currency: {currentCurrency.name}</span>
             <span>•</span>
             <span>Powered by Gemini 3.6 Flash Vision</span>
           </div>
