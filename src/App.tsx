@@ -23,7 +23,7 @@ export default function App() {
   const [isCodeGuideOpen, setIsCodeGuideOpen] = useState<boolean>(false);
   const [isDeployHelpOpen, setIsDeployHelpOpen] = useState<boolean>(false);
   
-  // Currency state - Defaults to Nigerian Naira (₦ / NGN)
+  // Currency state - Automatically adapts to document currency
   const [currentCurrency, setCurrentCurrency] = useState<CurrencyConfig>(SUPPORTED_CURRENCIES[0]);
 
   // Handle live PDF/Image OCR extraction request to backend Express /api/extract
@@ -50,8 +50,12 @@ export default function App() {
       }
 
       const meta = json.data.metadata || {};
-      if (meta.currency) {
-        setCurrentCurrency(getCurrencyConfig(meta.currency));
+      if (meta.currency || meta.currencyCode || meta.currencySymbol) {
+        const detected = getCurrencyConfig(
+          meta.currencyCode || meta.currency,
+          meta.currencySymbol
+        );
+        setCurrentCurrency(detected);
       }
 
       setExtractionResult({
@@ -71,8 +75,9 @@ export default function App() {
   const handleSelectSample = (sample: SampleBankStatement) => {
     setError(null);
     setActiveFileName(sample.fileName);
-    if (sample.sampleData.metadata.currency) {
-      setCurrentCurrency(getCurrencyConfig(sample.sampleData.metadata.currency));
+    const meta = sample.sampleData.metadata;
+    if (meta.currency || meta.currencyCode || meta.currencySymbol) {
+      setCurrentCurrency(getCurrencyConfig(meta.currencyCode || meta.currency, meta.currencySymbol));
     }
     setExtractionResult(sample.sampleData);
   };
@@ -231,7 +236,7 @@ export default function App() {
           <div className="flex items-center space-x-2">
             <span className="font-bold text-slate-700">Bank Statement OCR Extractor</span>
             <span>•</span>
-            <span>Default Currency: {currentCurrency.name}</span>
+            <span>Active Currency: {currentCurrency.name}</span>
             <span>•</span>
             <span>Powered by Gemini 3.6 Flash Vision</span>
           </div>

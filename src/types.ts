@@ -23,6 +23,8 @@ export interface StatementMetadata {
   startingBalance?: number;
   endingBalance?: number;
   currency?: string;
+  currencyCode?: string;
+  currencySymbol?: string;
   totalDeposits?: number;
   totalWithdrawals?: number;
   pageCount?: number;
@@ -47,13 +49,19 @@ export interface SampleBankStatement {
 }
 
 export const SUPPORTED_CURRENCIES: CurrencyConfig[] = [
-  { code: 'NGN', symbol: '₦', name: 'Nigerian Naira (₦)', locale: 'en-NG' },
   { code: 'USD', symbol: '$', name: 'US Dollar ($)', locale: 'en-US' },
-  { code: 'GBP', symbol: '£', name: 'British Pound (£)', locale: 'en-GB' },
   { code: 'EUR', symbol: '€', name: 'Euro (€)', locale: 'de-DE' },
+  { code: 'GBP', symbol: '£', name: 'British Pound (£)', locale: 'en-GB' },
+  { code: 'NGN', symbol: '₦', name: 'Nigerian Naira (₦)', locale: 'en-NG' },
   { code: 'CAD', symbol: '$', name: 'Canadian Dollar ($ CAD)', locale: 'en-CA' },
+  { code: 'AUD', symbol: '$', name: 'Australian Dollar ($ AUD)', locale: 'en-AU' },
+  { code: 'INR', symbol: '₹', name: 'Indian Rupee (₹)', locale: 'en-IN' },
+  { code: 'JPY', symbol: '¥', name: 'Japanese Yen (¥)', locale: 'ja-JP' },
+  { code: 'ZAR', symbol: 'R', name: 'South African Rand (R)', locale: 'en-ZA' },
   { code: 'GHS', symbol: 'GH₵', name: 'Ghanaian Cedi (GH₵)', locale: 'en-GH' },
   { code: 'KES', symbol: 'KSh', name: 'Kenyan Shilling (KSh)', locale: 'en-KE' },
-  { code: 'ZAR', symbol: 'R', name: 'South African Rand (R)', locale: 'en-ZA' }
+  { code: 'CHF', symbol: 'CHF', name: 'Swiss Franc (CHF)', locale: 'de-CH' },
+  { code: 'AED', symbol: 'AED', name: 'UAE Dirham (AED)', locale: 'ar-AE' },
+  { code: 'SGD', symbol: '$', name: 'Singapore Dollar ($ SGD)', locale: 'en-SG' }
 ];
 

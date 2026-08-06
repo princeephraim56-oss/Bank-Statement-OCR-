@@ -41,7 +41,7 @@ export const Header: React.FC<HeaderProps> = ({
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
               <span className="text-emerald-300 font-medium">Gemini 3.6 Flash Vision Active</span>
               <span className="text-slate-600">•</span>
-              <span className="text-slate-400">Default Currency: {currentCurrency.code} ({currentCurrency.symbol})</span>
+              <span className="text-slate-400">Currency: {currentCurrency.code} ({currentCurrency.symbol})</span>
             </div>
           </div>
         </div>

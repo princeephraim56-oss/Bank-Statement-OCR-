@@ -46,7 +46,10 @@ app.post("/api/extract", async (req, res) => {
             accountNumberMasked: { type: Type.STRING },
             statementPeriod: { type: Type.STRING },
             startingBalance: { type: Type.NUMBER },
-            endingBalance: { type: Type.NUMBER }
+            endingBalance: { type: Type.NUMBER },
+            currency: { type: Type.STRING, description: "Currency symbol or code (e.g. $, ₦, £, €, USD, EUR)" },
+            currencyCode: { type: Type.STRING, description: "ISO currency code (e.g. USD, EUR, GBP, NGN)" },
+            currencySymbol: { type: Type.STRING, description: "Currency symbol from document (e.g. $, ₦, £, €)" }
           }
         },
         transactions: {
@@ -76,10 +79,11 @@ app.post("/api/extract", async (req, res) => {
           {
             text: \`Extract ALL transactions from this bank statement.
 Rules:
-1. Output format YYYY-MM-DD for Date and Transaction Date.
-2. Positive numbers for deposits (+), Negative numbers for expenses (-).
-3. Auto-detect category (groceries, food, fuel, transport, bills, gifts, salary, etc).
-4. Skip headers, footers, and summary boxes.\`
+1. Infer currency code and symbol directly from the document headers, balances, or amounts (USD $, GBP £, EUR €, NGN ₦, etc).
+2. Output format YYYY-MM-DD for Date and Transaction Date.
+3. Positive numbers for deposits (+), Negative numbers for expenses (-).
+4. Auto-detect category (groceries, food, fuel, transport, bills, gifts, salary, etc).
+5. Skip headers, footers, and summary boxes.\`
           }
         ]
       },
@@ -105,7 +109,8 @@ Analyze this entire bank statement document (PDF or image). Extract EVERY SINGLE
 
 CRITICAL RULES FOR EXTRACTION:
 1. Extract ALL transactions. Do not omit any valid transaction row!
-2. SKIP headers, footers, page numbers, daily balance summary tables, total summary boxes, disclaimers, interest rate disclosures, and check registers summary tables.
+2. AUTOMATIC CURRENCY INFERENCE: Accurately infer the currency symbol and ISO code (USD $, GBP £, EUR €, NGN ₦, CAD C$, AUD A$, etc.) directly from the document headers, monetary symbols, or transaction text. Do not default to any single currency.
+3. SKIP headers, footers, page numbers, daily balance summary tables, total summary boxes, disclaimers, interest rate disclosures, and check registers summary tables.
 3. Date format: Convert all dates strictly to YYYY-MM-DD format (e.g. 2026-07-15). If the statement year is missing on individual line items, infer it from the statement header period or current year.
 4. Transaction Date: Use transaction date if provided, otherwise fallback to posting date in YYYY-MM-DD.
 5. Amount:

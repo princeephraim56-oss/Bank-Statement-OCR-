@@ -58,19 +58,23 @@ Analyze this entire bank statement document (PDF or image). Extract EVERY SINGLE
 
 CRITICAL RULES FOR EXTRACTION:
 1. Extract ALL transactions. Do not omit any valid transaction row!
-2. Detect Nigerian Naira (₦ / NGN) statements as well as USD ($), GBP (£), EUR (€), etc. Set the currency field in metadata accordingly (default to ₦ / NGN for Nigerian bank statements).
+2. AUTOMATIC CURRENCY INFERENCE:
+   - Carefully inspect the document's text, account headers, summary tables, balances, monetary column headers, and transaction descriptions to accurately infer the statement's true currency and currency symbol.
+   - Look for printed currency symbols (such as $, €, £, ₦, C$, A$, ¥, ₹, R, CHF, GH₵, KSh, AED, etc.) or ISO currency codes (such as USD, EUR, GBP, NGN, CAD, AUD, JPY, INR, ZAR, GHS, KES, CHF, AED, SGD, etc.) or banking institution location context.
+   - Set "currencyCode" (e.g. "USD", "EUR", "GBP", "NGN", "CAD", etc.) and "currencySymbol" (e.g. "$", "€", "£", "₦", "C$", etc.) based strictly on the uploaded document's visible contents.
+   - DO NOT default to Nigerian Naira or any single currency unless the document specifically contains Nigerian bank names or Naira (₦ / NGN) markers.
 3. SKIP headers, footers, page numbers, daily balance summary tables, total summary boxes, disclaimers, interest rate disclosures, and check registers summary tables.
 4. Date format: Convert all dates strictly to YYYY-MM-DD format (e.g. 2026-07-15). If the statement year is missing on individual line items, infer it from the statement header period or current year.
 5. Transaction Date: Use transaction date if provided, otherwise fallback to posting date in YYYY-MM-DD.
 6. Amount:
    - POSITIVE number (+) for deposits, credits, salary, transfers in, interest received, refunds.
    - NEGATIVE number (-) for expenses, debits, withdrawals, payments, fees, card purchases.
-   - Example: A purchase of 45,200 must be returned as -45200. A deposit of 250,000 must be +250000.
+   - Example: A purchase of 45.20 must be returned as -45.20. A deposit of 250,000 must be +250000.
 7. Category: Auto-detect the category from transaction description into one of:
    'groceries', 'food', 'fuel', 'transport', 'bills', 'gifts', 'shopping', 'salary', 'transfer', 'income', 'utility', 'entertainment', 'healthcare', 'software', 'subscription', 'fees', 'other'.
 8. Transaction Description: Provide a clean, readable transaction name or merchant description without trailing noise.
 9. Notes: Provide concise context if present (e.g., check #, reference code, city/state, or memo).
-10. Metadata: Extract bank name (e.g., GTBank, Zenith Bank, Access Bank, First Bank, UBA, Kuda, Stanbic, etc.), account holder name, masked account number, statement period, and opening/closing balances if visible in the document.
+10. Metadata: Extract bank name (e.g., Chase, Bank of America, Barclays, GTBank, Zenith Bank, Access Bank, Wells Fargo, etc.), account holder name, masked account number, statement period, and opening/closing balances if visible in the document.
 
 Output MUST be valid JSON matching the requested response schema.`;
 
@@ -86,7 +90,9 @@ Output MUST be valid JSON matching the requested response schema.`;
             statementPeriod: { type: Type.STRING, description: "Statement date range" },
             startingBalance: { type: Type.NUMBER, description: "Opening balance" },
             endingBalance: { type: Type.NUMBER, description: "Closing balance" },
-            currency: { type: Type.STRING, description: "Currency symbol or code" },
+            currency: { type: Type.STRING, description: "Inferred currency symbol or code (e.g. $, USD, ₦, NGN, £, GBP, €, EUR)" },
+            currencyCode: { type: Type.STRING, description: "3-letter ISO currency code (e.g. USD, EUR, GBP, NGN, CAD, AUD, ZAR)" },
+            currencySymbol: { type: Type.STRING, description: "The currency symbol identified from document (e.g. $, €, £, ₦, R, GH₵, KSh, ¥, ₹)" },
             totalDeposits: { type: Type.NUMBER, description: "Total deposit sum" },
             totalWithdrawals: { type: Type.NUMBER, description: "Total withdrawal sum" },
             pageCount: { type: Type.NUMBER, description: "Total pages processed" }
