@@ -68,6 +68,9 @@ app.post('/api/extract', async (req, res) => {
       }
     }
 
+    // Sanitize base64 string
+    cleanBase64 = cleanBase64.replace(/\s+/g, '');
+
     const ai = new GoogleGenAI({
       apiKey,
       httpOptions: {
@@ -142,33 +145,79 @@ Output MUST be valid JSON matching the requested response schema.`;
       required: ["transactions"]
     };
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.6-flash',
-      contents: {
-        parts: [
-          {
-            inlineData: {
-              mimeType: detectedMimeType || 'application/pdf',
-              data: cleanBase64
-            }
-          },
-          {
-            text: promptText
-          }
-        ]
-      },
-      config: {
-        responseMimeType: 'application/json',
-        responseSchema: responseSchema,
-        temperature: 0.1 // Low temperature for maximum deterministic OCR accuracy
-      }
-    });
+    // Resilient multi-model fallback chain
+    const candidateModels = ['gemini-3.6-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite'];
+    let lastError: any = null;
+    let responseText: string | null = null;
 
-    const responseText = response.text;
+    for (const modelName of candidateModels) {
+      let attempts = 0;
+      const maxAttempts = 2;
+
+      while (attempts < maxAttempts) {
+        attempts++;
+        try {
+          console.log(`Executing OCR with model ${modelName} (attempt ${attempts}/${maxAttempts})...`);
+          const response = await ai.models.generateContent({
+            model: modelName,
+            contents: [
+              {
+                inlineData: {
+                  mimeType: detectedMimeType || 'application/pdf',
+                  data: cleanBase64
+                }
+              },
+              promptText
+            ],
+            config: {
+              responseMimeType: 'application/json',
+              responseSchema: responseSchema,
+              temperature: 0.1
+            }
+          });
+
+          if (response && response.text) {
+            responseText = response.text;
+            break;
+          }
+        } catch (err: any) {
+          lastError = err;
+          console.warn(`Attempt ${attempts} with ${modelName} failed:`, err?.message || err);
+          
+          // If error is high demand (503) or rate limit (429), wait briefly before retry
+          const errMsg = String(err?.message || '');
+          if (errMsg.includes('503') || errMsg.includes('429') || errMsg.includes('demand') || errMsg.includes('UNAVAILABLE')) {
+            await new Promise(resolve => setTimeout(resolve, attempts * 1500));
+          } else {
+            // Non-transient error, try next candidate model
+            break;
+          }
+        }
+      }
+
+      if (responseText) {
+        break;
+      }
+    }
+
     if (!responseText) {
+      let userFriendlyMsg = 'Failed to extract transactions from document.';
+      if (lastError?.message) {
+        try {
+          const parsed = JSON.parse(lastError.message);
+          if (parsed?.error?.message) {
+            userFriendlyMsg = parsed.error.message;
+          } else {
+            userFriendlyMsg = lastError.message;
+          }
+        } catch {
+          userFriendlyMsg = lastError.message;
+        }
+      }
+
       return res.status(500).json({
-        error: 'Extraction Error',
-        message: 'No response text received from Gemini API.'
+        error: 'Extraction Failed',
+        message: userFriendlyMsg
       });
     }
 
