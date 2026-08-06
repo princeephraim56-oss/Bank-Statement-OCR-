@@ -21,11 +21,11 @@ app.get('/api/health', (req, res) => {
 // Gemini OCR Extraction Endpoint
 app.post('/api/extract', async (req, res) => {
   try {
-    const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.API_KEY || process.env.VITE_GEMINI_API_KEY;
     if (!apiKey) {
       return res.status(500).json({
         error: 'Missing API Key',
-        message: 'GEMINI_API_KEY environment variable is not configured. Please ensure your Gemini API key is configured in Settings > Secrets.'
+        message: 'GEMINI_API_KEY environment variable is not configured. Please add your Gemini API key in Project Settings > Secrets.'
       });
     }
 
