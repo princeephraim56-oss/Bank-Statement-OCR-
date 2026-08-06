@@ -1,35 +1,29 @@
-import express from 'express';
-import path from 'path';
-import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, Type } from '@google/genai';
-import dotenv from 'dotenv';
 
-dotenv.config();
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '50mb',
+    },
+  },
+};
 
-const app = express();
-const PORT = 3000;
+export default async function handler(req: any, res: any) {
+  // Only accept POST requests
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method Not Allowed', message: 'Only POST is supported' });
+  }
 
-// High payload limit for handling base64 PDF and image uploads
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
-
-// Health check endpoint
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
-
-// Gemini OCR Extraction Endpoint
-app.post('/api/extract', async (req, res) => {
   try {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       return res.status(500).json({
         error: 'Missing API Key',
-        message: 'GEMINI_API_KEY environment variable is missing. Please add it in Settings > Secrets.'
+        message: 'GEMINI_API_KEY environment variable is not configured. Please add it to your environment variables.'
       });
     }
 
-    const { fileData, mimeType, fileName } = req.body;
+    const { fileData, mimeType, fileName } = req.body || {};
 
     if (!fileData) {
       return res.status(400).json({
@@ -38,9 +32,9 @@ app.post('/api/extract', async (req, res) => {
       });
     }
 
-    // Clean base64 string if data URL prefix exists
+    // Clean base64 prefix if present
     let cleanBase64 = fileData;
-    if (fileData.includes(';base64,')) {
+    if (typeof fileData === 'string' && fileData.includes(';base64,')) {
       cleanBase64 = fileData.split(';base64,')[1];
     }
 
@@ -58,7 +52,7 @@ Analyze this entire bank statement document (PDF or image). Extract EVERY SINGLE
 
 CRITICAL RULES FOR EXTRACTION:
 1. Extract ALL transactions. Do not omit any valid transaction row!
-2. Detect Nigerian Naira (₦ / NGN) statements as well as USD ($), GBP (£), EUR (€), etc. Set the currency field in metadata accordingly (default to ₦ / NGN for Nigerian bank statements).
+2. Detect Nigerian Naira (₦ / NGN) statements as well as USD ($), GBP (£), EUR (€), etc. Set the currency field in metadata accordingly (default to NGN / ₦ if in Nigeria or when Naira symbols appear).
 3. SKIP headers, footers, page numbers, daily balance summary tables, total summary boxes, disclaimers, interest rate disclosures, and check registers summary tables.
 4. Date format: Convert all dates strictly to YYYY-MM-DD format (e.g. 2026-07-15). If the statement year is missing on individual line items, infer it from the statement header period or current year.
 5. Transaction Date: Use transaction date if provided, otherwise fallback to posting date in YYYY-MM-DD.
@@ -70,7 +64,7 @@ CRITICAL RULES FOR EXTRACTION:
    'groceries', 'food', 'fuel', 'transport', 'bills', 'gifts', 'shopping', 'salary', 'transfer', 'income', 'utility', 'entertainment', 'healthcare', 'software', 'subscription', 'fees', 'other'.
 8. Transaction Description: Provide a clean, readable transaction name or merchant description without trailing noise.
 9. Notes: Provide concise context if present (e.g., check #, reference code, city/state, or memo).
-10. Metadata: Extract bank name (e.g., GTBank, Zenith Bank, Access Bank, First Bank, UBA, Kuda, Stanbic, etc.), account holder name, masked account number, statement period, and opening/closing balances if visible in the document.
+10. Metadata: Extract bank name (e.g., GTBank, Zenith Bank, Access Bank, First Bank, Chase, etc.), account holder name, masked account number, statement period, and opening/closing balances if visible in the document.
 
 Output MUST be valid JSON matching the requested response schema.`;
 
@@ -86,7 +80,7 @@ Output MUST be valid JSON matching the requested response schema.`;
             statementPeriod: { type: Type.STRING, description: "Statement date range" },
             startingBalance: { type: Type.NUMBER, description: "Opening balance" },
             endingBalance: { type: Type.NUMBER, description: "Closing balance" },
-            currency: { type: Type.STRING, description: "Currency symbol or code" },
+            currency: { type: Type.STRING, description: "Currency symbol or code (e.g. ₦, NGN, $, USD)" },
             totalDeposits: { type: Type.NUMBER, description: "Total deposit sum" },
             totalWithdrawals: { type: Type.NUMBER, description: "Total withdrawal sum" },
             pageCount: { type: Type.NUMBER, description: "Total pages processed" }
@@ -130,7 +124,7 @@ Output MUST be valid JSON matching the requested response schema.`;
       config: {
         responseMimeType: 'application/json',
         responseSchema: responseSchema,
-        temperature: 0.1 // Low temperature for maximum deterministic OCR accuracy
+        temperature: 0.1
       }
     });
 
@@ -144,7 +138,6 @@ Output MUST be valid JSON matching the requested response schema.`;
 
     const parsedResult = JSON.parse(responseText);
 
-    // Ensure IDs for every transaction
     if (parsedResult.transactions && Array.isArray(parsedResult.transactions)) {
       parsedResult.transactions = parsedResult.transactions.map((t: any, idx: number) => ({
         id: `tx-${Date.now()}-${idx + 1}`,
@@ -163,40 +156,17 @@ Output MUST be valid JSON matching the requested response schema.`;
       parsedResult.metadata = {};
     }
 
-    res.json({
+    return res.status(200).json({
       success: true,
       fileName: fileName || 'statement',
       data: parsedResult
     });
 
   } catch (error: any) {
-    console.error('OCR Extraction Error:', error);
-    res.status(500).json({
+    console.error('Vercel API Extraction Error:', error);
+    return res.status(500).json({
       error: 'Extraction Failed',
       message: error?.message || 'Failed to process document with Gemini 3.6 Flash Vision OCR.'
     });
   }
-});
-
-// Start Express server and attach Vite middleware in dev mode
-async function startServer() {
-  if (process.env.NODE_ENV !== 'production') {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: 'spa'
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
-  }
-
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server listening at http://0.0.0.0:${PORT}`);
-  });
 }
-
-startServer();

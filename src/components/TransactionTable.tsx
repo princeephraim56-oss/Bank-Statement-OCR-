@@ -1,39 +1,42 @@
 import React, { useState } from 'react';
-import { TransactionItem } from '../types';
+import { TransactionItem, CurrencyConfig } from '../types';
 import { 
-  Download, Copy, Check, Search, Plus, Trash2, Edit3, 
-  ArrowUpDown, Filter, Sparkles, FileSpreadsheet, ArrowUpRight, ArrowDownLeft
+  Download, Check, Search, Plus, Trash2, Edit3, 
+  Filter, FileSpreadsheet, ArrowUpRight, ArrowDownLeft, X, Save
 } from 'lucide-react';
 import { downloadCsvFile, copyToClipboard, generateTsvForSheets } from '../utils/csv';
+import { formatCurrencyAmount } from '../utils/currency';
 
 interface TransactionTableProps {
   transactions: TransactionItem[];
   onUpdateTransactions: (updated: TransactionItem[]) => void;
+  currency: CurrencyConfig;
 }
 
 const CATEGORY_PILLS: Record<string, string> = {
-  groceries: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  food: 'bg-amber-50 text-amber-700 border-amber-200',
-  fuel: 'bg-orange-50 text-orange-700 border-orange-200',
-  transport: 'bg-blue-50 text-blue-700 border-blue-200',
-  bills: 'bg-rose-50 text-rose-700 border-rose-200',
-  gifts: 'bg-purple-50 text-purple-700 border-purple-200',
-  shopping: 'bg-indigo-50 text-indigo-700 border-indigo-200',
-  salary: 'bg-teal-50 text-teal-700 border-teal-200',
-  income: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+  groceries: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+  food: 'bg-orange-50 text-orange-700 border-orange-200',
+  fuel: 'bg-amber-50 text-amber-700 border-amber-200',
+  transport: 'bg-purple-50 text-purple-700 border-purple-200',
+  bills: 'bg-blue-50 text-blue-700 border-blue-200',
+  gifts: 'bg-pink-50 text-pink-700 border-pink-200',
+  shopping: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  salary: 'bg-emerald-100 text-emerald-800 border-emerald-300 font-bold',
+  income: 'bg-emerald-50 text-emerald-700 border-emerald-200 font-bold',
   transfer: 'bg-cyan-50 text-cyan-700 border-cyan-200',
   utility: 'bg-rose-50 text-rose-700 border-rose-200',
-  entertainment: 'bg-pink-50 text-pink-700 border-pink-200',
+  entertainment: 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200',
   healthcare: 'bg-sky-50 text-sky-700 border-sky-200',
   software: 'bg-violet-50 text-violet-700 border-violet-200',
-  subscription: 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200',
-  fees: 'bg-red-50 text-red-700 border-red-200',
-  other: 'bg-slate-100 text-slate-700 border-slate-200'
+  subscription: 'bg-teal-50 text-teal-700 border-teal-200',
+  fees: 'bg-rose-100 text-rose-800 border-rose-200',
+  other: 'bg-slate-100 text-slate-600 border-slate-200'
 };
 
 export const TransactionTable: React.FC<TransactionTableProps> = ({
   transactions,
-  onUpdateTransactions
+  onUpdateTransactions,
+  currency
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'deposits' | 'expenses'>('all');
@@ -62,15 +65,24 @@ export const TransactionTable: React.FC<TransactionTableProps> = ({
     if (searchTerm.trim() !== '') {
       const term = searchTerm.toLowerCase();
       const matchDesc = t.description.toLowerCase().includes(term);
-      const matchNotes = t.notes.toLowerCase().includes(term);
-      const matchCat = t.category.toLowerCase().includes(term);
-      const matchDate = t.date.includes(term) || t.transactionDate.includes(term);
+      const matchNotes = (t.notes || '').toLowerCase().includes(term);
+      const matchCat = (t.category || '').toLowerCase().includes(term);
+      const matchDate = (t.date || '').includes(term) || (t.transactionDate || '').includes(term);
       const matchAmt = t.amount.toString().includes(term);
       return matchDesc || matchNotes || matchCat || matchDate || matchAmt;
     }
 
     return true;
   });
+
+  // Calculate summary figures
+  const totalFilteredDeposits = filteredTransactions
+    .filter(t => t.amount > 0)
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  const totalFilteredExpenses = filteredTransactions
+    .filter(t => t.amount < 0)
+    .reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
   // Handle Copy to Clipboard for Google Sheets (TSV Grid format)
   const handleCopyForSheets = async () => {
@@ -84,7 +96,7 @@ export const TransactionTable: React.FC<TransactionTableProps> = ({
 
   // Handle CSV Download
   const handleDownloadCsv = () => {
-    downloadCsvFile(filteredTransactions, `bank_statement_ocr_${new Date().toISOString().slice(0,10)}.csv`);
+    downloadCsvFile(filteredTransactions, `bank_statement_${currency.code}_${new Date().toISOString().slice(0,10)}.csv`);
   };
 
   // Start Editing
@@ -111,7 +123,7 @@ export const TransactionTable: React.FC<TransactionTableProps> = ({
 
   // Delete Row
   const handleDeleteRow = (id: string) => {
-    if (confirm('Delete this transaction row?')) {
+    if (confirm('Delete this transaction line item?')) {
       onUpdateTransactions(transactions.filter(t => t.id !== id));
     }
   };
@@ -122,20 +134,20 @@ export const TransactionTable: React.FC<TransactionTableProps> = ({
       id: `tx-manual-${Date.now()}`,
       date: new Date().toISOString().slice(0, 10),
       transactionDate: new Date().toISOString().slice(0, 10),
-      amount: -25.00,
+      amount: -15000.00,
       category: 'other',
-      description: 'New Transaction',
-      notes: 'Manually added'
+      description: 'Manual Transaction Entry',
+      notes: 'Added manually'
     };
     onUpdateTransactions([newRow, ...transactions]);
     startEditing(newRow);
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden space-y-0">
+    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
       
-      {/* Table Action Header */}
-      <div className="p-4 sm:p-5 border-b border-slate-200 bg-slate-50/50 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+      {/* Table Control Toolbar */}
+      <div className="p-4 sm:p-5 border-b border-slate-200 bg-slate-50/70 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         
         {/* Search & Filters */}
         <div className="flex flex-wrap items-center gap-2.5">
@@ -151,7 +163,7 @@ export const TransactionTable: React.FC<TransactionTableProps> = ({
             />
           </div>
 
-          {/* Type Filter Buttons */}
+          {/* Type Filter Tabs */}
           <div className="inline-flex rounded-lg p-1 bg-slate-200/80 text-xs font-medium text-slate-600">
             <button
               onClick={() => setFilterType('all')}
@@ -188,32 +200,32 @@ export const TransactionTable: React.FC<TransactionTableProps> = ({
           </select>
         </div>
 
-        {/* Action Buttons: Google Sheets Paste & Download CSV */}
-        <div className="flex items-center space-x-2">
+        {/* Action Buttons */}
+        <div className="flex items-center space-x-2 flex-wrap sm:flex-nowrap">
           
           <button
             onClick={handleAddRow}
-            className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg flex items-center space-x-1.5 transition-colors border border-slate-300"
+            className="px-3 py-2 bg-white hover:bg-slate-100 text-slate-700 text-xs font-semibold rounded-lg flex items-center space-x-1.5 transition-colors border border-slate-300 shadow-2xs"
             title="Add a manual transaction row"
           >
             <Plus className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Add Row</span>
+            <span>Add Row</span>
           </button>
 
-          {/* COPY FOR GOOGLE SHEETS BUTTON */}
+          {/* COPY FOR GOOGLE SHEETS BUTTON (Styled per Professional Polish theme) */}
           <button
             onClick={handleCopyForSheets}
-            className={`px-4 py-2 text-xs font-bold rounded-lg shadow-sm flex items-center space-x-2 transition-all ${
+            className={`px-4 py-2 text-xs font-bold rounded-lg shadow-md flex items-center space-x-2 transition-all cursor-pointer ${
               copied
                 ? 'bg-emerald-700 text-white'
-                : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                : 'bg-emerald-600 hover:bg-emerald-700 text-white'
             }`}
-            title="Copy formatted grid to clipboard for direct Google Sheets paste"
+            title="Copy formatted CSV / TSV grid directly to clipboard for Google Sheets"
           >
             {copied ? (
               <>
                 <Check className="w-4 h-4" />
-                <span>Copied for Google Sheets!</span>
+                <span>Copied to Clipboard!</span>
               </>
             ) : (
               <>
@@ -226,7 +238,7 @@ export const TransactionTable: React.FC<TransactionTableProps> = ({
           {/* DOWNLOAD CSV BUTTON */}
           <button
             onClick={handleDownloadCsv}
-            className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-lg shadow-sm flex items-center space-x-1.5 transition-colors"
+            className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg shadow-sm flex items-center space-x-1.5 transition-colors"
             title="Download CSV spreadsheet file"
           >
             <Download className="w-3.5 h-3.5" />
@@ -237,32 +249,39 @@ export const TransactionTable: React.FC<TransactionTableProps> = ({
 
       </div>
 
-      {/* Main Table Container */}
-      <div className="overflow-x-auto min-h-[350px]">
-        <table className="w-full text-left text-xs border-collapse">
+      {/* Main Table View */}
+      <div className="overflow-x-auto min-h-[360px]">
+        <table className="w-full border-collapse text-left text-sm">
           
           {/* Table Header */}
-          <thead>
-            <tr className="bg-slate-100/80 text-slate-700 font-bold border-b border-slate-200 uppercase tracking-wider text-[11px]">
-              <th className="py-3 px-4 w-32">Date</th>
-              <th className="py-3 px-4 w-32">Tx Date</th>
-              <th className="py-3 px-4 w-32 text-right">Amount ($)</th>
-              <th className="py-3 px-4 w-36">Category</th>
-              <th className="py-3 px-4">Transaction Description</th>
-              <th className="py-3 px-4">Notes</th>
-              <th className="py-3 px-4 w-20 text-center">Actions</th>
+          <thead className="bg-slate-50 border-b border-slate-200 sticky top-0 z-10">
+            <tr>
+              <th className="px-4 py-3 font-semibold text-slate-600 w-32 text-xs uppercase tracking-wider">Post Date</th>
+              <th className="px-4 py-3 font-semibold text-slate-600 w-32 text-xs uppercase tracking-wider">Trans Date</th>
+              <th className="px-4 py-3 font-semibold text-slate-600 w-36 text-right text-xs uppercase tracking-wider">
+                Amount ({currency.symbol})
+              </th>
+              <th className="px-4 py-3 font-semibold text-slate-600 text-xs uppercase tracking-wider">
+                Description
+              </th>
+              <th className="px-4 py-3 font-semibold text-slate-600 w-44 text-xs uppercase tracking-wider">
+                Category/Notes
+              </th>
+              <th className="px-4 py-3 font-semibold text-slate-600 w-24 text-center text-xs uppercase tracking-wider">
+                Actions
+              </th>
             </tr>
           </thead>
 
           {/* Table Body */}
-          <tbody className="divide-y divide-slate-200/80 text-slate-800">
+          <tbody className="divide-y divide-slate-100 text-slate-800 text-xs">
             {filteredTransactions.length === 0 ? (
               <tr>
-                <td colSpan={7} className="py-12 text-center text-slate-500">
+                <td colSpan={6} className="py-14 text-center text-slate-500">
                   <div className="flex flex-col items-center justify-center space-y-2">
                     <Filter className="w-8 h-8 text-slate-300" />
-                    <p className="text-sm font-medium text-slate-600">No transactions match current search/filter</p>
-                    <p className="text-xs text-slate-400">Try clearing the search box or changing category filter</p>
+                    <p className="text-sm font-semibold text-slate-700">No transactions match current filters</p>
+                    <p className="text-xs text-slate-400">Try clearing search keywords or switching category filters</p>
                   </div>
                 </td>
               </tr>
@@ -275,12 +294,12 @@ export const TransactionTable: React.FC<TransactionTableProps> = ({
                 return (
                   <tr
                     key={tx.id}
-                    className={`hover:bg-slate-50/80 transition-colors ${
-                      isEditing ? 'bg-amber-50/50' : isDeposit ? 'bg-emerald-50/10' : ''
+                    className={`hover:bg-slate-50 transition-colors ${
+                      isEditing ? 'bg-amber-50/60' : ''
                     }`}
                   >
-                    {/* Date */}
-                    <td className="py-3 px-4 font-mono font-medium text-slate-700 whitespace-nowrap">
+                    {/* Post Date */}
+                    <td className="px-4 py-3 font-mono text-slate-600 whitespace-nowrap">
                       {isEditing ? (
                         <input
                           type="date"
@@ -293,8 +312,8 @@ export const TransactionTable: React.FC<TransactionTableProps> = ({
                       )}
                     </td>
 
-                    {/* Transaction Date */}
-                    <td className="py-3 px-4 font-mono text-slate-500 whitespace-nowrap">
+                    {/* Trans Date */}
+                    <td className="px-4 py-3 font-mono text-slate-500 whitespace-nowrap">
                       {isEditing ? (
                         <input
                           type="date"
@@ -308,88 +327,100 @@ export const TransactionTable: React.FC<TransactionTableProps> = ({
                     </td>
 
                     {/* Amount */}
-                    <td className="py-3 px-4 text-right font-mono font-bold whitespace-nowrap">
+                    <td className={`px-4 py-3 text-right font-semibold font-mono whitespace-nowrap ${
+                      isDeposit ? 'text-emerald-600' : 'text-rose-600'
+                    }`}>
                       {isEditing ? (
                         <input
                           type="number"
                           step="0.01"
                           value={editForm.amount !== undefined ? editForm.amount : ''}
                           onChange={(e) => setEditForm({ ...editForm, amount: parseFloat(e.target.value) || 0 })}
-                          className="w-24 bg-white border border-amber-300 rounded px-1.5 py-1 text-xs text-right"
+                          className="w-28 bg-white border border-amber-300 rounded px-1.5 py-1 text-xs text-right font-mono"
                         />
                       ) : (
-                        <span className={isDeposit ? 'text-emerald-600' : 'text-slate-900'}>
-                          {isDeposit ? '+' : ''}${tx.amount.toFixed(2)}
-                        </span>
-                      )}
-                    </td>
-
-                    {/* Category */}
-                    <td className="py-3 px-4 whitespace-nowrap">
-                      {isEditing ? (
-                        <input
-                          type="text"
-                          value={editForm.category || ''}
-                          onChange={(e) => setEditForm({ ...editForm, category: e.target.value.toLowerCase() })}
-                          className="w-full bg-white border border-amber-300 rounded px-1.5 py-1 text-xs"
-                        />
-                      ) : (
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${categoryClass}`}>
-                          {tx.category || 'other'}
-                        </span>
+                        formatCurrencyAmount(tx.amount, currency.symbol, true)
                       )}
                     </td>
 
                     {/* Description */}
-                    <td className="py-3 px-4 font-medium text-slate-900">
+                    <td className="px-4 py-3 text-slate-800">
                       {isEditing ? (
                         <input
                           type="text"
                           value={editForm.description || ''}
                           onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                          className="w-full bg-white border border-amber-300 rounded px-1.5 py-1 text-xs"
+                          className="w-full bg-white border border-amber-300 rounded px-2 py-1 text-xs font-sans"
                         />
                       ) : (
-                        tx.description
+                        <span className="font-medium text-slate-800">{tx.description}</span>
                       )}
                     </td>
 
-                    {/* Notes */}
-                    <td className="py-3 px-4 text-slate-500">
+                    {/* Category & Notes */}
+                    <td className="px-4 py-3">
                       {isEditing ? (
-                        <input
-                          type="text"
-                          value={editForm.notes || ''}
-                          onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
-                          className="w-full bg-white border border-amber-300 rounded px-1.5 py-1 text-xs"
-                        />
+                        <div className="space-y-1.5">
+                          <input
+                            type="text"
+                            placeholder="Category"
+                            value={editForm.category || ''}
+                            onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
+                            className="w-full bg-white border border-amber-300 rounded px-2 py-0.5 text-xs"
+                          />
+                          <input
+                            type="text"
+                            placeholder="Notes/Memo"
+                            value={editForm.notes || ''}
+                            onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                            className="w-full bg-white border border-amber-300 rounded px-2 py-0.5 text-[11px]"
+                          />
+                        </div>
                       ) : (
-                        tx.notes || <span className="text-slate-300 italic">—</span>
+                        <div className="flex flex-col items-start gap-1">
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider border ${categoryClass}`}>
+                            {tx.category || 'other'}
+                          </span>
+                          {tx.notes && (
+                            <span className="text-[11px] text-slate-400 italic line-clamp-1">
+                              {tx.notes}
+                            </span>
+                          )}
+                        </div>
                       )}
                     </td>
 
                     {/* Actions */}
-                    <td className="py-3 px-4 text-center whitespace-nowrap">
+                    <td className="px-4 py-3 text-center whitespace-nowrap">
                       {isEditing ? (
-                        <button
-                          onClick={() => saveEditing(tx.id)}
-                          className="p-1 bg-emerald-600 text-white rounded hover:bg-emerald-700 transition-colors"
-                          title="Save changes"
-                        >
-                          <Check className="w-3.5 h-3.5" />
-                        </button>
+                        <div className="flex items-center justify-center space-x-1">
+                          <button
+                            onClick={() => saveEditing(tx.id)}
+                            className="p-1 bg-emerald-600 text-white rounded hover:bg-emerald-700 transition-colors"
+                            title="Save Changes"
+                          >
+                            <Save className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => setEditingId(null)}
+                            className="p-1 bg-slate-200 text-slate-700 rounded hover:bg-slate-300 transition-colors"
+                            title="Cancel"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       ) : (
                         <div className="flex items-center justify-center space-x-1.5">
                           <button
                             onClick={() => startEditing(tx)}
-                            className="p-1 text-slate-400 hover:text-slate-700 rounded transition-colors"
+                            className="p-1 text-slate-400 hover:text-slate-700 rounded hover:bg-slate-100 transition-colors"
                             title="Edit row"
                           >
                             <Edit3 className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={() => handleDeleteRow(tx.id)}
-                            className="p-1 text-slate-400 hover:text-rose-600 rounded transition-colors"
+                            className="p-1 text-slate-400 hover:text-rose-600 rounded hover:bg-rose-50 transition-colors"
                             title="Delete row"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -403,27 +434,28 @@ export const TransactionTable: React.FC<TransactionTableProps> = ({
               })
             )}
           </tbody>
-
         </table>
       </div>
 
-      {/* Table Footer Summary Bar */}
-      <div className="p-4 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-600">
-        <div>
-          Showing <span className="font-bold text-slate-800">{filteredTransactions.length}</span> of{' '}
-          <span className="font-bold text-slate-800">{transactions.length}</span> total rows
-        </div>
-        <div className="flex items-center space-x-4">
-          <span>
-            Net Visible Flow:{' '}
-            <strong className="font-mono text-slate-900">
-              ${filteredTransactions.reduce((acc, t) => acc + t.amount, 0).toFixed(2)}
-            </strong>
-          </span>
-          <span className="text-slate-300">|</span>
-          <span className="text-emerald-700 font-medium flex items-center gap-1">
-            <Sparkles className="w-3.5 h-3.5" /> Ready for Google Sheets paste
-          </span>
+      {/* Bottom Status Bar (Per "Professional Polish" Mockup Design) */}
+      <div className="mt-auto bg-slate-50 p-3.5 border-t border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-2">
+        <span className="text-xs text-slate-500 font-medium">
+          {filteredTransactions.length} transactions detected • Output YYYY-MM-DD format for Google Sheets
+        </span>
+        <div className="flex items-center gap-4 text-xs">
+          <div className="flex items-center gap-1.5">
+            <span className="text-[11px] text-slate-500 uppercase font-semibold">Expenses:</span>
+            <span className="text-xs font-bold text-rose-600 font-mono">
+              -{formatCurrencyAmount(totalFilteredExpenses, currency.symbol, false)}
+            </span>
+          </div>
+          <div className="h-3 w-[1px] bg-slate-300 hidden sm:block"></div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[11px] text-slate-500 uppercase font-semibold">Deposits:</span>
+            <span className="text-xs font-bold text-emerald-600 font-mono">
+              +{formatCurrencyAmount(totalFilteredDeposits, currency.symbol, false)}
+            </span>
+          </div>
         </div>
       </div>
 
