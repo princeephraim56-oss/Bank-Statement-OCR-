@@ -21,11 +21,11 @@ app.get('/api/health', (req, res) => {
 // Gemini OCR Extraction Endpoint
 app.post('/api/extract', async (req, res) => {
   try {
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.API_KEY;
     if (!apiKey) {
       return res.status(500).json({
         error: 'Missing API Key',
-        message: 'GEMINI_API_KEY environment variable is missing. Please add it in Settings > Secrets.'
+        message: 'GEMINI_API_KEY environment variable is not configured. Please ensure your Gemini API key is configured in Settings > Secrets.'
       });
     }
 
@@ -38,10 +38,34 @@ app.post('/api/extract', async (req, res) => {
       });
     }
 
-    // Clean base64 string if data URL prefix exists
+    // Clean base64 string if data URL prefix exists and detect true MIME type
     let cleanBase64 = fileData;
-    if (fileData.includes(';base64,')) {
-      cleanBase64 = fileData.split(';base64,')[1];
+    let detectedMimeType = mimeType;
+
+    if (typeof fileData === 'string' && fileData.startsWith('data:')) {
+      const match = fileData.match(/^data:([^;]+);base64,(.+)$/s);
+      if (match) {
+        detectedMimeType = match[1] || detectedMimeType;
+        cleanBase64 = match[2];
+      } else if (fileData.includes(';base64,')) {
+        cleanBase64 = fileData.split(';base64,')[1];
+      }
+    }
+
+    // Infer MIME type if missing or octet-stream
+    if (!detectedMimeType || detectedMimeType === 'application/octet-stream') {
+      const lowerName = (fileName || '').toLowerCase();
+      if (lowerName.endsWith('.pdf')) {
+        detectedMimeType = 'application/pdf';
+      } else if (lowerName.endsWith('.png')) {
+        detectedMimeType = 'image/png';
+      } else if (lowerName.endsWith('.jpg') || lowerName.endsWith('.jpeg')) {
+        detectedMimeType = 'image/jpeg';
+      } else if (lowerName.endsWith('.webp')) {
+        detectedMimeType = 'image/webp';
+      } else {
+        detectedMimeType = 'application/pdf';
+      }
     }
 
     const ai = new GoogleGenAI({
@@ -124,7 +148,7 @@ Output MUST be valid JSON matching the requested response schema.`;
         parts: [
           {
             inlineData: {
-              mimeType: mimeType || 'application/pdf',
+              mimeType: detectedMimeType || 'application/pdf',
               data: cleanBase64
             }
           },
@@ -148,7 +172,20 @@ Output MUST be valid JSON matching the requested response schema.`;
       });
     }
 
-    const parsedResult = JSON.parse(responseText);
+    let parsedResult: any;
+    try {
+      let cleaned = responseText.trim();
+      if (cleaned.startsWith('```')) {
+        cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+      }
+      parsedResult = JSON.parse(cleaned);
+    } catch (parseErr: any) {
+      console.error('JSON parsing failed:', parseErr, 'Raw response:', responseText);
+      return res.status(500).json({
+        error: 'Parsing Error',
+        message: 'Unable to parse structured JSON from OCR response.'
+      });
+    }
 
     // Ensure IDs for every transaction
     if (parsedResult.transactions && Array.isArray(parsedResult.transactions)) {

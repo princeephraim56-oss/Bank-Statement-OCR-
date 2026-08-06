@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { 
   Upload, FileText, Image as ImageIcon, Sparkles, CheckCircle, 
-  AlertCircle, FileCheck, ArrowRight, Loader2, X, Plus, Files, Calendar
+  AlertCircle, FileCheck, ArrowRight, Loader2, X, Plus, Files, Calendar, RefreshCw
 } from 'lucide-react';
 import { SAMPLE_BANK_STATEMENTS } from '../data/sampleStatements';
 import { SampleBankStatement } from '../types';
@@ -385,12 +385,24 @@ export const FileUpload: React.FC<FileUploadProps> = ({
 
           {/* Error Banner */}
           {error && (
-            <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl flex items-start space-x-3 text-rose-800 text-xs">
-              <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
-              <div>
-                <p className="font-bold text-sm">OCR Processing Error</p>
-                <p className="mt-0.5">{error}</p>
+            <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl flex items-start justify-between gap-3 text-rose-800 text-xs">
+              <div className="flex items-start space-x-3">
+                <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-bold text-sm">OCR Processing Error</p>
+                  <p className="mt-0.5 leading-relaxed">{error}</p>
+                </div>
               </div>
+              {stagedFiles.length > 0 && !isLoading && (
+                <button
+                  type="button"
+                  onClick={handleSubmit}
+                  className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-semibold rounded-lg shadow-2xs flex items-center gap-1.5 shrink-0 transition-colors cursor-pointer"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Retry</span>
+                </button>
+              )}
             </div>
           )}
 
