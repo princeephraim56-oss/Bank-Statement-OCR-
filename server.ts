@@ -146,8 +146,11 @@ Output MUST be valid JSON matching the requested response schema.`;
     };
 
     // Resilient multi-model fallback chain
-    const candidateModels = ['gemini-3.6-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite'];
-    let lastError: any = null;
+    // gemini-3.6-flash, gemini-3.1-flash-lite, and gemini-flash-latest have distinct quota and rate limits
+    const candidateModels = ['gemini-3.6-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
+    let lastErrorMessage = 'Failed to extract transactions from document.';
+    let isQuotaExceeded = false;
+    let retryAfterSeconds = 0;
     let responseText: string | null = null;
 
     for (const modelName of candidateModels) {
@@ -157,7 +160,7 @@ Output MUST be valid JSON matching the requested response schema.`;
       while (attempts < maxAttempts) {
         attempts++;
         try {
-          console.log(`Executing OCR with model ${modelName} (attempt ${attempts}/${maxAttempts})...`);
+          console.log(`[OCR] Attempting with model ${modelName} (attempt ${attempts}/${maxAttempts})...`);
           const response = await ai.models.generateContent({
             model: modelName,
             contents: [
@@ -178,18 +181,45 @@ Output MUST be valid JSON matching the requested response schema.`;
 
           if (response && response.text) {
             responseText = response.text;
+            console.log(`[OCR] Successfully extracted content with ${modelName}`);
             break;
           }
         } catch (err: any) {
-          lastError = err;
-          console.warn(`Attempt ${attempts} with ${modelName} failed:`, err?.message || err);
+          const rawErrStr = String(err?.message || err || '');
+          console.warn(`[OCR] Model ${modelName} attempt ${attempts} failed:`, rawErrStr);
           
-          // If error is high demand (503) or rate limit (429), wait briefly before retry
-          const errMsg = String(err?.message || '');
-          if (errMsg.includes('503') || errMsg.includes('429') || errMsg.includes('demand') || errMsg.includes('UNAVAILABLE')) {
+          let parsedMsg = rawErrStr;
+          try {
+            const rawJson = typeof parsedMsg === 'string' && parsedMsg.startsWith('{') ? JSON.parse(parsedMsg) : null;
+            if (rawJson?.error?.message) {
+              parsedMsg = rawJson.error.message;
+            }
+          } catch {
+            // Keep raw string
+          }
+
+          // Check if quota/rate limit error
+          if (/resource_exhausted|quota|429|rate-limits/i.test(rawErrStr)) {
+            isQuotaExceeded = true;
+            const delayMatch = rawErrStr.match(/retry in ([0-9.]+)s/i) || rawErrStr.match(/retryDelay["\s:]+(\d+)s/i);
+            if (delayMatch) {
+              retryAfterSeconds = Math.max(retryAfterSeconds, Math.ceil(parseFloat(delayMatch[1])));
+            } else if (!retryAfterSeconds) {
+              retryAfterSeconds = 45;
+            }
+            lastErrorMessage = `Gemini API quota rate limit reached. Please wait ${retryAfterSeconds || 45} seconds before sending new documents.`;
+            // Immediately break out of this model's retry loop to try the next candidate model
+            break;
+          }
+
+          lastErrorMessage = parsedMsg;
+
+          // Check for transient server errors (503 / fetch failed)
+          const isTransient = /503|demand|UNAVAILABLE|fetch failed|ECONNRESET|ETIMEDOUT/i.test(rawErrStr);
+          if (isTransient && attempts < maxAttempts) {
             await new Promise(resolve => setTimeout(resolve, attempts * 1500));
           } else {
-            // Non-transient error, try next candidate model
+            // Move to next candidate model immediately
             break;
           }
         }
@@ -201,23 +231,12 @@ Output MUST be valid JSON matching the requested response schema.`;
     }
 
     if (!responseText) {
-      let userFriendlyMsg = 'Failed to extract transactions from document.';
-      if (lastError?.message) {
-        try {
-          const parsed = JSON.parse(lastError.message);
-          if (parsed?.error?.message) {
-            userFriendlyMsg = parsed.error.message;
-          } else {
-            userFriendlyMsg = lastError.message;
-          }
-        } catch {
-          userFriendlyMsg = lastError.message;
-        }
-      }
-
-      return res.status(500).json({
-        error: 'Extraction Failed',
-        message: userFriendlyMsg
+      return res.status(isQuotaExceeded ? 429 : 500).json({
+        success: false,
+        isQuotaExceeded,
+        retryAfterSeconds: retryAfterSeconds > 0 ? retryAfterSeconds : (isQuotaExceeded ? 45 : undefined),
+        error: isQuotaExceeded ? 'Rate Limit Exceeded' : 'Extraction Failed',
+        message: lastErrorMessage || 'Unable to process document with Gemini OCR.'
       });
     }
 
@@ -231,6 +250,7 @@ Output MUST be valid JSON matching the requested response schema.`;
     } catch (parseErr: any) {
       console.error('JSON parsing failed:', parseErr, 'Raw response:', responseText);
       return res.status(500).json({
+        success: false,
         error: 'Parsing Error',
         message: 'Unable to parse structured JSON from OCR response.'
       });
@@ -263,11 +283,42 @@ Output MUST be valid JSON matching the requested response schema.`;
 
   } catch (error: any) {
     console.error('OCR Extraction Error:', error);
+    let cleanErr = error?.message || 'Failed to process document with Gemini Vision OCR.';
+    try {
+      const parsed = typeof cleanErr === 'string' && cleanErr.startsWith('{') ? JSON.parse(cleanErr) : null;
+      if (parsed?.error?.message) cleanErr = parsed.error.message;
+    } catch {
+      // ignore
+    }
     res.status(500).json({
+      success: false,
       error: 'Extraction Failed',
-      message: error?.message || 'Failed to process document with Gemini 3.6 Flash Vision OCR.'
+      message: cleanErr
     });
   }
+});
+
+// Explicit API 404 handler for unmatched /api routes
+app.all('/api/*', (req, res) => {
+  res.status(404).json({
+    success: false,
+    error: 'Not Found',
+    message: `API route ${req.method} ${req.path} does not exist.`
+  });
+});
+
+// JSON Error Middleware to prevent Express from sending HTML errors for API requests
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error('[API Middleware Error]:', err);
+  if (res.headersSent) {
+    return next(err);
+  }
+  const statusCode = typeof err.status === 'number' ? err.status : 500;
+  res.status(statusCode).json({
+    success: false,
+    error: err.name || 'Server Error',
+    message: err.message || 'An error occurred during request execution.'
+  });
 });
 
 // Start Express server and attach Vite middleware in dev mode

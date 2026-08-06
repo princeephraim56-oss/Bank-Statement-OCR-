@@ -1,7 +1,7 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   Upload, FileText, Image as ImageIcon, Sparkles, CheckCircle, 
-  AlertCircle, FileCheck, ArrowRight, Loader2, X, Plus, Files, Calendar, RefreshCw
+  AlertCircle, FileCheck, ArrowRight, Loader2, X, Plus, Files, Calendar, RefreshCw, Clock
 } from 'lucide-react';
 import { SAMPLE_BANK_STATEMENTS } from '../data/sampleStatements';
 import { SampleBankStatement } from '../types';
@@ -39,8 +39,35 @@ export const FileUpload: React.FC<FileUploadProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const [stagedFiles, setStagedFiles] = useState<StagedUploadFile[]>([]);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [cooldownRemaining, setCooldownRemaining] = useState<number | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Detect rate limit cooldown seconds from error message
+  useEffect(() => {
+    if (error && /quota|rate limit|resource_exhausted|retry in/i.test(error)) {
+      const match = error.match(/(?:wait|retry in)\s*([0-9.]+)\s*s/i);
+      const secs = match ? Math.ceil(parseFloat(match[1])) : 55;
+      setCooldownRemaining(secs);
+    } else {
+      setCooldownRemaining(null);
+    }
+  }, [error]);
+
+  // Live countdown timer
+  useEffect(() => {
+    if (cooldownRemaining === null || cooldownRemaining <= 0) return;
+    const timer = setInterval(() => {
+      setCooldownRemaining(prev => {
+        if (prev === null || prev <= 1) {
+          clearInterval(timer);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [cooldownRemaining]);
 
   const formatFileSize = (bytes: number): string => {
     if (bytes < 1024 * 1024) {
@@ -383,26 +410,57 @@ export const FileUpload: React.FC<FileUploadProps> = ({
             </div>
           )}
 
-          {/* Error Banner */}
+          {/* Error Banner & Rate Limit Countdown */}
           {error && (
-            <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl flex items-start justify-between gap-3 text-rose-800 text-xs">
+            <div className={`p-4 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-xs transition-all ${
+              cooldownRemaining !== null && cooldownRemaining > 0
+                ? 'bg-amber-50/90 border-amber-200 text-amber-900 shadow-xs'
+                : 'bg-rose-50 border-rose-200 text-rose-800'
+            }`}>
               <div className="flex items-start space-x-3">
-                <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                {cooldownRemaining !== null && cooldownRemaining > 0 ? (
+                  <Clock className="w-5 h-5 text-amber-600 shrink-0 mt-0.5 animate-pulse" />
+                ) : (
+                  <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                )}
                 <div>
-                  <p className="font-bold text-sm">OCR Processing Error</p>
-                  <p className="mt-0.5 leading-relaxed">{error}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-bold text-sm">
+                      {cooldownRemaining !== null && cooldownRemaining > 0
+                        ? 'Gemini API Rate Limit Cooldown'
+                        : 'OCR Processing Error'}
+                    </p>
+                    {cooldownRemaining !== null && cooldownRemaining > 0 && (
+                      <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-200 text-amber-900">
+                        {cooldownRemaining}s remaining
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-1 leading-relaxed text-slate-700">
+                    {cooldownRemaining !== null && cooldownRemaining > 0
+                      ? 'The AI model quota is temporarily cooling down. Your staged documents are safe and ready to process as soon as the timer ends.'
+                      : error}
+                  </p>
                 </div>
               </div>
-              {stagedFiles.length > 0 && !isLoading && (
-                <button
-                  type="button"
-                  onClick={handleSubmit}
-                  className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-semibold rounded-lg shadow-2xs flex items-center gap-1.5 shrink-0 transition-colors cursor-pointer"
-                >
-                  <RefreshCw className="w-3.5 h-3.5" />
-                  <span>Retry</span>
-                </button>
-              )}
+
+              <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                {stagedFiles.length > 0 && !isLoading && (
+                  <button
+                    type="button"
+                    onClick={handleSubmit}
+                    disabled={cooldownRemaining !== null && cooldownRemaining > 0}
+                    className={`px-3.5 py-1.5 font-semibold rounded-lg shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer ${
+                      cooldownRemaining !== null && cooldownRemaining > 0
+                        ? 'bg-amber-200 text-amber-800 cursor-not-allowed opacity-75'
+                        : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                    }`}
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+                    <span>{cooldownRemaining !== null && cooldownRemaining > 0 ? `Wait (${cooldownRemaining}s)` : 'Retry OCR'}</span>
+                  </button>
+                )}
+              </div>
             </div>
           )}
 

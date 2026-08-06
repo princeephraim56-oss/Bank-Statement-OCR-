@@ -57,28 +57,74 @@ export default function App() {
     try {
       for (let i = 0; i < files.length; i++) {
         const item = files[i];
-        setBatchProgress({
-          currentFileIndex: i + 1,
-          totalFiles: files.length,
-          currentFileName: item.fileName,
-          stage: 'Running Gemini 3.6 Flash OCR...'
-        });
+        
+        let json: any = null;
+        let fileError: string | null = null;
+        const maxFileRetries = 2;
 
-        const response = await fetch('/api/extract', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            fileData: item.fileData,
-            mimeType: item.mimeType,
-            fileName: item.fileName
-          })
-        });
+        for (let attempt = 1; attempt <= maxFileRetries; attempt++) {
+          try {
+            setBatchProgress({
+              currentFileIndex: i + 1,
+              totalFiles: files.length,
+              currentFileName: item.fileName,
+              stage: attempt === 1 
+                ? 'Processing document with Gemini Vision OCR...' 
+                : `Retrying (${attempt}/${maxFileRetries}) with Gemini OCR...`
+            });
 
-        const json = await response.json();
+            const response = await fetch('/api/extract', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                fileData: item.fileData,
+                mimeType: item.mimeType,
+                fileName: item.fileName
+              })
+            });
 
-        if (!response.ok || !json.success) {
+            const contentType = response.headers.get('content-type') || '';
+            let responseData: any = null;
+
+            if (contentType.includes('application/json')) {
+              responseData = await response.json();
+            } else {
+              const rawText = await response.text();
+              throw new Error(`Server returned unexpected ${response.status} response: ${rawText.slice(0, 100)}`);
+            }
+
+            if (!response.ok || !responseData.success) {
+              let errMsg = responseData?.message || responseData?.error || `HTTP error ${response.status}`;
+              // Clean nested JSON if returned
+              try {
+                if (typeof errMsg === 'string' && errMsg.startsWith('{')) {
+                  const parsed = JSON.parse(errMsg);
+                  if (parsed?.error?.message) errMsg = parsed.error.message;
+                }
+              } catch {
+                // keep string
+              }
+              throw new Error(errMsg);
+            }
+
+            json = responseData;
+            break; // Success! Exit retry loop
+          } catch (attemptErr: any) {
+            fileError = attemptErr?.message || 'OCR Extraction failed';
+            console.warn(`Extraction attempt ${attempt} for "${item.fileName}" failed:`, fileError);
+            
+            const isTransient = /503|429|demand|UNAVAILABLE|RESOURCE_EXHAUSTED|fetch failed|network|ECONNRESET/i.test(fileError);
+            if (isTransient && attempt < maxFileRetries) {
+              await new Promise(r => setTimeout(r, attempt * 2000));
+            } else {
+              break;
+            }
+          }
+        }
+
+        if (!json || !json.success) {
           throw new Error(
-            `Failed processing "${item.fileName}": ${json.message || json.error || 'OCR Extraction failed'}`
+            `Failed processing "${item.fileName}": ${fileError || 'Unable to extract transactions from document.'}`
           );
         }
 
